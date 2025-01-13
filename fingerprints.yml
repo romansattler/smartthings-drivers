@@ -1,0 +1,20 @@
+zigbeeManufacturer:
+  - id: Philips/LCT010
+    deviceLabel: Philips Light
+    manufacturer: Philips
+    model: LCT010
+    deviceProfileName: rgbw-bulb
+  - id: Philips/LCA001
+    deviceLabel: Philips Light
+    manufacturer: Philips
+    model: LCA001
+    deviceProfileName: rgbw-bulb
+zigbeeGeneric:
+  - id: "genericColorBulb"
+    deviceLabel: Zigbee Light
+    clusters:
+      server:
+        - 0x0006 #OnOff
+        - 0x0008 #Level
+        - 0x0300 #Color Control
+    deviceProfileName: rgbw-bulb

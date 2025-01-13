@@ -1,0 +1,6 @@
+name: 'Philips Hue Bulb Codelab'
+packageKey: 'philips-hue-bulb-codelab'
+permissions:
+  zigbee: {}
+description: "SmartThings driver for Zigbee switch devices"
+vendorSupportInformation: "https://support.smartthings.com"
