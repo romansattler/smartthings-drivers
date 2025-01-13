@@ -1,6 +1,6 @@
-name: 'Philips Hue Bulb Codelab'
-packageKey: 'philips-hue-bulb-codelab'
+name: "Nexentro Blinds Actuator"
+packageKey: "nexentro-blinds-actuator"
 permissions:
   zigbee: {}
-description: "SmartThings driver for Zigbee switch devices"
-vendorSupportInformation: "https://support.smartthings.com"
+description: "Supports Nexentro Blinds Actuator"
+vendorSupportInformation: "https://community.smartthings.com"

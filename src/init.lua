@@ -1,138 +1,101 @@
--- Copyright 2022 SmartThings
---
--- Licensed under the Apache License, Version 2.0 (the "License");
--- you may not use this file except in compliance with the License.
--- You may obtain a copy of the License at
---
---     http://www.apache.org/licenses/LICENSE-2.0
---
--- Unless required by applicable law or agreed to in writing, software
--- distributed under the License is distributed on an "AS IS" BASIS,
--- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
--- See the License for the specific language governing permissions and
--- limitations under the License.
+local log = require "log"
 
 local capabilities = require "st.capabilities"
 local ZigbeeDriver = require "st.zigbee"
 local defaults = require "st.zigbee.defaults"
-local clusters = require "st.zigbee.zcl.clusters"
-local configurationMap = require "configurations"
-local SimpleMetering = clusters.SimpleMetering
-local ElectricalMeasurement = clusters.ElectricalMeasurement
-local preferences = require "preferences"
-local log = require "log"
+local zcl_clusters = require "st.zigbee.zcl.clusters"
 
-local function lazy_load_if_possible(sub_driver_name)
-  -- gets the current lua libs api version
-  local version = require "version"
+local WindowCovering = zcl_clusters.WindowCovering
 
-  -- version 9 will include the lazy loading functions
-  if version.api >= 9 then
-    return ZigbeeDriver.lazy_load_sub_driver(require(sub_driver_name))
+local function added_handler(self, device)
+  device:emit_event(capabilities.windowShade.supportedWindowShadeCommands({ "open", "close", "pause" },
+    { visibility = { displayed = false } }))
+end
+
+local function current_position_lift_attr_handler(driver, device, value, zb_rx)
+  local level = 100 - value.value
+
+  if level == -155 then -- unknown position
+    device:emit_event(capabilities.windowShade.windowShade.unknown())
+    device:emit_event(capabilities.windowShadeLevel.shadeLevel(100))
+    device:emit_event(capabilities.windowShadeTiltLevel.shadeTiltLevel(0))
+
+    return
+  end
+
+  if level == 100 then
+    device:emit_event(capabilities.windowShade.windowShade.open())
+  elseif level == 0 then
+    device:emit_event(capabilities.windowShade.windowShade.closed())
   else
-    return require(sub_driver_name)
+    device:emit_event(capabilities.windowShade.windowShade.partially_open())
   end
 
+  device:emit_event(capabilities.windowShadeLevel.shadeLevel(level))
 end
 
-local function info_changed(self, device, event, args)
-  preferences.update_preferences(self, device, args)
+local function current_position_tilt_attr_handler(driver, device, value, zb_rx)
+  local tilt = value.value
+
+  device:emit_event(capabilities.windowShadeTiltLevel.shadeTiltLevel(tilt))
 end
 
-local do_configure = function(self, device)
-  device:refresh()
-  device:configure()
-
-  -- Additional one time configuration
-  if device:supports_capability(capabilities.energyMeter) or device:supports_capability(capabilities.powerMeter) then
-    -- Divisor and multipler for EnergyMeter
-    device:send(ElectricalMeasurement.attributes.ACPowerDivisor:read(device))
-    device:send(ElectricalMeasurement.attributes.ACPowerMultiplier:read(device))
-    -- Divisor and multipler for PowerMeter
-    device:send(SimpleMetering.attributes.Divisor:read(device))
-    device:send(SimpleMetering.attributes.Multiplier:read(device))
-  end
+local function window_shade_tilt_level_cmd(driver, device, command)
+  device:send_to_component(command.component,
+    WindowCovering.server.commands.GoToTiltPercentage(device, command.args.level))
 end
 
-local function component_to_endpoint(device, component_id)
-  local ep_num = component_id:match("switch(%d)")
-  return ep_num and tonumber(ep_num) or device.fingerprinted_endpoint_id
+local function set_shade_level(device, value, command)
+  local level = 100 - value
+  device:send_to_component(command.component, WindowCovering.server.commands.GoToLiftPercentage(device, level))
 end
 
-local function endpoint_to_component(device, ep)
-  local switch_comp = string.format("switch%d", ep)
-  if device.profile.components[switch_comp] ~= nil then
-    return switch_comp
-  else
-    return "main"
+local function window_shade_level_cmd(driver, device, command)
+  set_shade_level(device, command.args.shadeLevel, command)
+end
+
+local function window_shade_preset_cmd(driver, device, command)
+  if device.preferences ~= nil and device.preferences.presetPosition ~= nil then
+    set_shade_level(device, device.preferences.presetPosition, command)
   end
 end
 
-local ColorControl = clusters.ColorControl
-
-local PHILIPS_HUE_COLORS = {
-  {0xED, 0xC4}, -- red
-  {0xAE, 0xE3}, -- blue
-  {0x2C, 0xC3}, -- yellow
-  {0x53, 0xD3}, -- green
-  {0xCA, 0x08}, -- white
-}
-
-local index = 1
-
-local TRANSITION_TIME = 0 --1/10ths of a second
--- When sent with a command, these options mask and override bitmaps cause the command
--- to take effect when the switch/light is off.
-local OPTIONS_MASK = 0x01
-local OPTIONS_OVERRIDE = 0x01
-
-local device_init = function(self, device)
-  log.info_with({ hub_logs = true }, string.format("[DDO] device_init"))
-  device:set_component_to_endpoint_fn(component_to_endpoint)
-  device:set_endpoint_to_component_fn(endpoint_to_component)
-
-  local configuration = configurationMap.get_device_configuration(device)
-  if configuration ~= nil then
-    for _, attribute in ipairs(configuration) do
-      device:add_configured_attribute(attribute)
-      device:add_monitored_attribute(attribute)
-    end
-  end
-
-  local ias_zone_config_method = configurationMap.get_ias_zone_config_method(device)
-  if ias_zone_config_method ~= nil then
-    device:set_ias_zone_config_method(ias_zone_config_method)
-  end
-
-  ------------------------------------------------------------------------------------------------------------------------------
-  -- [Code Lab] Create a SmartThings Edge Driver for an IoT bulb
-  --   * device: philips-hue white and color bulb (Model: 9290013678)
-  --   * Initial color of bulb is white
-  --   * Place code block below to change the color of the bulb periodically
-  ------------------------------------------------------------------------------------------------------------------------------
-
-
-
-end
-
-local philips_hue_bulb_codelab_template = {
+local nexentro_blinds_actuator_template = {
   supported_capabilities = {
-    capabilities.switch,
-    capabilities.switchLevel,
-    capabilities.colorControl,
-    capabilities.colorTemperature,
-    capabilities.powerMeter,
-    capabilities.energyMeter,
-    capabilities.motionSensor
+    capabilities.windowShade,
+    capabilities.windowShadePreset,
+    capabilities.windowShadeLevel,
+    capabilities.windowShadeTiltLevel,
+    capabilities.powerSource,
+    capabilities.battery
   },
   lifecycle_handlers = {
-    init = device_init,
-    infoChanged = info_changed,
-    doConfigure = do_configure
-  }
+    added = added_handler
+  },
+  zigbee_handlers = {
+    attr = {
+      [WindowCovering.ID] = {
+        [WindowCovering.attributes.CurrentPositionLiftPercentage.ID] = current_position_lift_attr_handler,
+        [WindowCovering.attributes.CurrentPositionTiltPercentage.ID] = current_position_tilt_attr_handler
+      }
+    }
+  },
+  capability_handlers = {
+    [capabilities.windowShadeLevel.ID] = {
+      [capabilities.windowShadeLevel.commands.setShadeLevel.NAME] = window_shade_level_cmd
+    },
+    [capabilities.windowShadePreset.ID] = {
+      [capabilities.windowShadePreset.commands.presetPosition.NAME] = window_shade_preset_cmd
+    },
+    [capabilities.windowShadeTiltLevel.ID] = {
+      [capabilities.windowShadeTiltLevel.commands.setShadeTiltLevel.NAME] = window_shade_tilt_level_cmd
+    }
+  },
 }
 
-defaults.register_for_default_handlers(philips_hue_bulb_codelab_template,
-philips_hue_bulb_codelab_template.supported_capabilities)
-local zigbee_switch = ZigbeeDriver("zigbee_switch", philips_hue_bulb_codelab_template)
-zigbee_switch:run()
+defaults.register_for_default_handlers(nexentro_blinds_actuator_template,
+  nexentro_blinds_actuator_template.supported_capabilities)
+
+local nexentro_blinds_actuator = ZigbeeDriver("nexentro_blinds_actuator", nexentro_blinds_actuator_template)
+
+nexentro_blinds_actuator:run()
