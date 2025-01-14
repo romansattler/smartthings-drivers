@@ -1,0 +1,6 @@
+name: Nexentro Pushbutton Interface
+packageKey: nexentro-pushbutton-interface
+permissions:
+  zigbee: {}
+description: Supports Nexentro Pushbutton Interface
+vendorSupportInformation: "https://community.smartthings.com"

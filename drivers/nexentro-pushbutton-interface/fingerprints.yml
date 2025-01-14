@@ -1,0 +1,6 @@
+zigbeeManufacturer:
+  - id: "Insta GmbH/Pushbutton Interface"
+    deviceLabel: NEXENTRO Pushbutton Interface
+    manufacturer: Insta GmbH
+    model: NEXENTRO Pushbutton Interface
+    deviceProfileName: nexentro-pushbutton-interface
