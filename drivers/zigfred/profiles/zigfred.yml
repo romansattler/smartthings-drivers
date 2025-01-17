@@ -1,17 +1,12 @@
 name: zigfred
 components:
   - id: main
-    label: zigfred
     capabilities:
       - id: switch
         version: 1
-      - id: switchLevel
+      - id: firmwareUpdate
         version: 1
-        config:
-          values:
-            - key: "level.value"
-              range: [1, 100]
-      - id: colorControl
+      - id: refresh
         version: 1
     categories:
-      - name: Light
+      - name: Switch
