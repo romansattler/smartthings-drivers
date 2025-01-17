@@ -1,0 +1,6 @@
+zigbeeManufacturer:
+  - id: Siglis AG/zigfred uno
+    deviceLabel: zigfred uno
+    manufacturer: Siglis
+    model: zigfred uno
+    deviceProfileName: zigfred

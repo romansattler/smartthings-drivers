@@ -1,0 +1,6 @@
+name: Zigfred
+packageKey: zigfred
+permissions:
+  zigbee: {}
+description: Supports zigfred uno
+vendorSupportInformation: "https://community.smartthings.com"
