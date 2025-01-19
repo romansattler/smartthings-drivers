@@ -1,6 +1,7 @@
 local log = require "log"
 local capabilities = require "st.capabilities"
 local st_device = require "st.device"
+local utils = require "st.utils"
 local ZigbeeDriver = require "st.zigbee"
 local defaults = require "st.zigbee.defaults"
 local clusters = require "st.zigbee.zcl.clusters"
@@ -8,6 +9,10 @@ local clusters = require "st.zigbee.zcl.clusters"
 local Level = clusters.Level
 local OnOff = clusters.OnOff
 local ColorControl = clusters.ColorControl
+
+local CURRENT_X = "current_x_value"
+local CURRENT_Y = "current_y_value"
+local Y_TRISTIMULUS_VALUE = "y_tristimulus_value"
 
 local function endpoint_to_component(device, endpoint)
   log.trace("endpoint_to_component", device, endpoint)
@@ -43,16 +48,9 @@ local function added_handler(driver, device)
     return
   end
 
-  local main_ep = device:get_endpoint(ColorControl.ID)
-
-  device:emit_event_for_endpoint(main_ep,
-    capabilities.switch.switch.off(), { visibility = { displayed = false } })
-  device:emit_event_for_endpoint(main_ep,
-    capabilities.switchLevel.level(100), { visibility = { displayed = false } })
-  device:emit_event_for_endpoint(main_ep,
-    capabilities.colorControl.hue(0), { visibility = { displayed = false } })
-  device:emit_event_for_endpoint(main_ep,
-    capabilities.colorControl.saturation(0), { visibility = { displayed = false } })
+  device:set_field(CURRENT_X, 0)
+  device:set_field(CURRENT_Y, 0)
+  device:set_field(Y_TRISTIMULUS_VALUE, 1)
 
   for ep_id, ep in pairs(device.zigbee_endpoints) do
     if find_child(device, ep_id) == nil then
@@ -99,6 +97,72 @@ local function set_level_handler(driver, device, cmd)
   device:send_to_component(cmd.component, Level.commands.MoveToLevelWithOnOff(device, level, dimming_rate))
 end
 
+local function current_level_attr_handler(driver, device, value, zb_rx)
+  log.debug("current_level_attr_handler", driver, device, value, zb_rx)
+
+  local current_level = math.floor(value.value / 254.0 * 100)
+
+  local event = capabilities.switchLevel.level(current_level)
+  device:emit_event_for_endpoint(zb_rx.address_header.src_endpoint.value, event)
+end
+
+local function on_off_attr_handler(driver, device, value, zb_rx)
+  log.debug("on_off_attr_handler", driver, device, value, zb_rx)
+
+  local event = value.value and capabilities.switch.switch.on() or capabilities.switch.switch.off()
+  device:emit_event_for_endpoint(zb_rx.address_header.src_endpoint.value, event)
+end
+
+local function current_x_attr_handler(driver, device, value, zb_rx)
+  log.debug("current_x_attr_handler", driver, device, value, zb_rx)
+
+  local x = value.value
+  local y = device:get_field(CURRENT_Y)
+  local Y = device:get_field(Y_TRISTIMULUS_VALUE) or 1
+
+  if y then
+    local hue, saturation = utils.safe_xy_to_hsv(x, y, Y)
+
+    device:emit_event_for_endpoint(zb_rx.address_header.src_endpoint.value,
+      capabilities.colorControl.hue(hue))
+    device:emit_event_for_endpoint(zb_rx.address_header.src_endpoint.value,
+      capabilities.colorControl.saturation(saturation))
+  end
+
+  device:set_field(CURRENT_Y, y)
+end
+
+local function current_y_attr_handler(driver, device, value, zb_rx)
+  log.debug("current_y_attr_handler", driver, device, value, zb_rx)
+
+  local x = device:get_field(CURRENT_X)
+  local y = value.value
+  local Y = device:get_field(Y_TRISTIMULUS_VALUE) or 1
+
+  if x then
+    local hue, saturation = utils.safe_xy_to_hsv(x, y, Y)
+
+    device:emit_event_for_endpoint(zb_rx.address_header.src_endpoint.value,
+      capabilities.colorControl.hue(hue))
+    device:emit_event_for_endpoint(zb_rx.address_header.src_endpoint.value,
+      capabilities.colorControl.saturation(saturation))
+  end
+
+  device:set_field(CURRENT_X, x)
+end
+
+local function set_color_handler(driver, device, cmd)
+  log.debug("set_color_handler", driver, device, cmd)
+
+  local x, y, Y = utils.safe_hsv_to_xy(cmd.args.color.hue, cmd.args.color.saturation)
+
+  device:set_field(Y_TRISTIMULUS_VALUE, Y)
+  device:set_field(CURRENT_X, x)
+  device:set_field(CURRENT_Y, y)
+
+  device:send_to_component(cmd.component, ColorControl.commands.MoveToColor(device, x, y, 0x0000))
+end
+
 local zigfred_template = {
   supported_capabilities = {
     capabilities.switch,
@@ -114,11 +178,29 @@ local zigfred_template = {
   capability_handlers = {
     [capabilities.switchLevel.ID] = {
       [capabilities.switchLevel.commands.setLevel.NAME] = set_level_handler
+    },
+    [capabilities.colorControl.ID] = {
+      [capabilities.colorControl.commands.setColor.NAME] = set_color_handler
     }
   },
+  zigbee_handlers = {
+    attr = {
+      [OnOff.ID] = {
+        [OnOff.attributes.OnOff.ID] = on_off_attr_handler,
+      },
+      [Level.ID] = {
+        [Level.attributes.CurrentLevel.ID] = current_level_attr_handler,
+      },
+      [ColorControl.ID] = {
+        [ColorControl.attributes.CurrentX.ID] = current_x_attr_handler,
+        [ColorControl.attributes.CurrentY.ID] = current_y_attr_handler,
+      }
+    }
+  }
 }
 
-defaults.register_for_default_handlers(zigfred_template, zigfred_template.supported_capabilities)
+defaults.register_for_default_handlers(zigfred_template,
+  zigfred_template.supported_capabilities, { native_capability_cmds_enabled = true })
 local zigfred = ZigbeeDriver("zigfred", zigfred_template)
 
 zigfred:run()
