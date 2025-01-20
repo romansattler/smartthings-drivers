@@ -63,4 +63,26 @@ zigbee_handlers.current_y_attr_handler = function(driver, device, value, zb_rx)
     device:set_field(CURRENT_X, x)
 end
 
+zigbee_handlers.button_command_handler = function(driver, device, zb_rx)
+    log.debug("button_event_handler", driver, device, zb_rx)
+
+    local bytes = zb_rx.body.zcl_body.body_bytes
+    local button_num = bytes:byte(1) + 1
+    local action_id = bytes:byte(2)
+
+    local component_id = "button" .. button_num
+    local component = device.profile.components[component_id]
+
+    if action_id == 1 then     -- single
+        device:emit_component_event(component, capabilities.button.button.pushed({ state_change = true }))
+    elseif action_id == 2 then -- double
+        device:emit_component_event(component, capabilities.button.button.double({ state_change = true }))
+    elseif action_id == 3 then -- hold
+        device:emit_component_event(component, capabilities.button.button.down_hold({ state_change = true }))
+        device:emit_component_event(component, capabilities.button.button.held({ state_change = true }))
+    elseif action_id == 0 then -- release
+        device:emit_component_event(component, capabilities.button.button.up_hold({ state_change = true }))
+    end
+end
+
 return zigbee_handlers

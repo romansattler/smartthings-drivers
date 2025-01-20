@@ -1,4 +1,5 @@
 local log = require "log"
+local capabilities = require "st.capabilities"
 local st_device = require "st.device"
 local clusters = require "st.zigbee.zcl.clusters"
 local constants = require "constants"
@@ -50,6 +51,16 @@ lifecycle_handlers.added_handler = function(driver, device)
     device:set_field(CURRENT_X, 0)
     device:set_field(CURRENT_Y, 0)
     device:set_field(Y_TRISTIMULUS_VALUE, 1)
+
+    for i = 1, 4 do
+        device:emit_component_event(device.profile.components["button" .. i],
+            capabilities.button.supportedButtonValues({ "pushed", "held", "double", "down_hold", "up_hold" },
+                { visibility = { displayed = false } }))
+        device:emit_component_event(device.profile.components["button" .. i],
+            capabilities.button.numberOfButtons({ value = 1 }))
+        device:emit_component_event(device.profile.components["button" .. i],
+            capabilities.button.button.pushed({ state_change = false }))
+    end
 
     for ep_id, ep in pairs(device.zigbee_endpoints) do
         if find_child(device, ep_id) == nil then

@@ -9,6 +9,7 @@ local zigbee_handlers = require "zigbee_handlers"
 local Level = clusters.Level
 local OnOff = clusters.OnOff
 local ColorControl = clusters.ColorControl
+local Custom = { ID = 0xFC42, server = { commands = { Button = { ID = 0x02 } } } }
 
 local zigfred_template = {
   supported_capabilities = {
@@ -42,6 +43,11 @@ local zigfred_template = {
         [ColorControl.attributes.CurrentX.ID] = zigbee_handlers.current_x_attr_handler,
         [ColorControl.attributes.CurrentY.ID] = zigbee_handlers.current_y_attr_handler,
       }
+    },
+    cluster = {
+      [Custom.ID] = {
+        [Custom.server.commands.Button.ID] = zigbee_handlers.button_command_handler
+      },
     }
   }
 }

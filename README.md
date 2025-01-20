@@ -7,10 +7,11 @@ Custom Edge drivers for Samsung SmartThings.
   - Support for window shade tilt
 - Nexentro Pushbutton Interface
   - Bind to button `pushed` event
-- Siglis Zigfred Uno
-    - Control module LED
-    - Control dimmers and relays
+- Siglis Zigfred
+  - Control module LED
+  - Control dimmers and relays
+  - Bind to button `pushed`, `double` and `held` events
 
 ## Known Issues
 - Nexentro Pushbutton Interface can only bind to button 1
-- Siglis Zigfred Uno does not bind to button events
+- Siglis Zigfred does not support window treatment capability
