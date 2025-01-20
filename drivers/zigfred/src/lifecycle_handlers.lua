@@ -53,12 +53,15 @@ lifecycle_handlers.added_handler = function(driver, device)
     device:set_field(Y_TRISTIMULUS_VALUE, 1)
 
     for i = 1, 4 do
-        device:emit_component_event(device.profile.components["button" .. i],
+        local component_id = "button" .. 1
+        local component = device.profile.components[component_id]
+
+        device:emit_component_event(component,
             capabilities.button.supportedButtonValues({ "pushed", "held", "double", "down_hold", "up_hold" },
                 { visibility = { displayed = false } }))
-        device:emit_component_event(device.profile.components["button" .. i],
+        device:emit_component_event(component,
             capabilities.button.numberOfButtons({ value = 1 }))
-        device:emit_component_event(device.profile.components["button" .. i],
+        device:emit_component_event(component,
             capabilities.button.button.pushed({ state_change = false }))
     end
 
