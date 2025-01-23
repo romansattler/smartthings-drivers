@@ -2,11 +2,23 @@ name: nexentro-pushbutton-interface
 components:
   - id: main
     capabilities:
-      - id: button
-        version: 1
       - id: firmwareUpdate
         version: 1
       - id: refresh
+        version: 1
+    categories:
+      - name: RemoteController
+  - id: button1
+    label: Button 1
+    capabilities:
+      - id: button
+        version: 1
+    categories:
+      - name: Button
+  - id: button2
+    label: Button 2
+    capabilities:
+      - id: button
         version: 1
     categories:
       - name: Button

@@ -13,5 +13,4 @@ Custom Edge drivers for Samsung SmartThings.
   - Bind to button `pushed`, `double` and `held` events
 
 ## Known Issues
-- Nexentro Pushbutton Interface can only bind to button 1
 - Siglis Zigfred does not support window treatment capability
